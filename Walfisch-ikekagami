@@ -1,0 +1,109 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"strconv"
+)
+import "math"
+
+func check(e error) {
+	if e != nil {
+		panic(e)
+	}
+}
+func rts(w float64, f float64, hroof float64, hrx float64) float64 {
+	Irts := (-1)*16.9 - 10*math.Log10(w) + 10*math.Log10(f) + 20*math.Log10(hroof-hrx)
+	return (Irts)
+}
+
+func msd(htx float64, hroof float64, d float64, hrx float64, f float64, b float64) float64 {
+	var Ibsh, ka, kd float64
+	if htx > hroof {
+		Ibsh = -18 * (1 + (htx - hroof))
+		ka = 54
+		kd = 18
+	} else {
+		if d > 500 {
+			ka = 54 - 0.8*(htx-hroof)
+		} else {
+			ka = 54 - (0.8 * (htx - hroof) * (d / 5000))
+		}
+		Ibsh = 0
+		kd = 18 - 15*(htx-hroof)/(hroof-hrx)
+	}
+	kf := (-1)*4 + 0.7*(f/925-1)
+	Imsd := Ibsh + ka + kd*math.Log10(d/1000) + kf*math.Log10(f) - 9*math.Log10(b)
+	return (Imsd)
+
+}
+func I(f float64, d float64) float64 {
+	Io := 32.44 + 20*math.Log10(f) + 20*math.Log10(d/1000)
+	return (Io)
+}
+
+func main() {
+	fc := []int{400, 800, 1800}
+	var PathLos [3][6]float64
+	var d int
+	j := 0
+	var w, hroof, htx, hrx, b, k float64
+	w = 3
+	hroof = 10
+	htx = 12
+	hrx = 2
+	b = 5
+	k = 1
+	f, err := os.Create("/home/richard/matlab/bin/summer/ekakagami.txt")
+	check(err)
+
+	for i := 0; i < 3; i++ {
+		j = 0
+		for d = 20; d < 5100; {
+			if k == 0 {
+
+				PathLos[i][j] = 42.6 + 26*math.Log10((float64(d))/100.0) + 20*math.Log10(float64(fc[i]))
+				Path := strconv.FormatFloat(PathLos[i][j], 'f', 4, 64)
+				_, err = f.WriteString(Path)
+				check(err)
+				_, err = f.WriteString(" ")
+				check(err)
+				fmt.Printf("PathLoss(Db)= %f\n ", PathLos[i][j])
+				d = d + 500
+			} else {
+				Irts := rts(w, float64(fc[i]), hroof, hrx)
+				Imsd := msd(htx, hroof, float64(d), hrx, float64(fc[i]), b)
+				Io := I(float64(fc[i]), float64(d))
+				if Irts+Imsd > 0 {
+					PathLos[i][j] = Io + Irts + Imsd
+					fmt.Printf(">0")
+
+				} else {
+					PathLos[i][j] = Io
+					fmt.Printf("<0")
+				}
+				Path := strconv.FormatFloat(PathLos[i][j], 'f', 4, 64)
+				_, err = f.WriteString(Path)
+				check(err)
+				_, err = f.WriteString(" ")
+				check(err)
+				fmt.Printf("PathLoss(Db)= %f\n ", PathLos[i][j])
+				d = d + 500
+			}
+
+		}
+		_, err = f.WriteString("\n")
+		check(err)
+	}
+	for d = 20; d < 5100; {
+		Dis := strconv.FormatFloat(float64(d), 'f', 4, 64)
+		_, err := f.WriteString(Dis)
+		check(err)
+		_, err = f.WriteString(" ")
+		check(err)
+		d = d + 500
+	}
+	f.Sync()
+	f.Close()
+
+}
